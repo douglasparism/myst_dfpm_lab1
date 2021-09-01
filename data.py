@@ -1,4 +1,3 @@
-
 """
 # -- --------------------------------------------------------------------------------------------------- -- #
 # -- project: A SHORT DESCRIPTION OF THE PROJECT                                                         -- #
@@ -9,4 +8,35 @@
 # -- --------------------------------------------------------------------------------------------------- -- #
 """
 
-dict_test = {'key_a': 'a', 'key_b': 'b'}
+import os
+import pandas as pd
+
+
+def dates(period):
+    abspath = os.path.abspath('files/')
+    datesl = [f[-12:-4] for f in os.listdir(abspath) if os.path.isfile(os.path.join(abspath, f))]
+    if period == "pre":
+        return datesl[0:25]
+    if period == "in":
+        return datesl[25:]
+
+
+def get_naftrac_data():
+    abspath = os.path.abspath('files/')
+    datesl = [f[-12:-4] for f in os.listdir(abspath) if os.path.isfile(os.path.join(abspath, f))]
+    archivos = ["NAFTRAC_" + i for i in sorted(datesl)]
+    data_dicc = {}
+    j = 0
+
+    for i in archivos:
+        p = os.path.join(abspath, i + '.csv')
+        data = pd.read_csv(p, skiprows=2)
+        data = data[:-1]
+        cols_to_num = ["Precio", "Acciones", "Valor de mercado"]
+        data[cols_to_num] = data[cols_to_num].replace({',': ''}, regex=True).astype(float, errors='raise')
+        data["Peso (%)"] = data["Valor de mercado"] / sum(data["Valor de mercado"])
+        key = datesl[j]
+        j += 1
+        data_dicc[key] = data
+
+    return data_dicc

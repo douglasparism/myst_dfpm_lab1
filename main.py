@@ -9,40 +9,25 @@
 # -- --------------------------------------------------------------------------------------------------- -- #
 """
 
-import pandas as pd
 import data as dt
+from functions import *
 
-# -- TEST 1 : 
-# verify that the script is being read
-print(dt.dict_test)
+NAFTRAC_dicc = dt.get_naftrac_data()
+comission = 0.00125
+restricted = ["KOFL.MX", "KOFUBL.MX", "USD.MXN", "BSMXB.MX", "NMKA.MX", "MXN.MX"]
+dates_a = dt.dates("pre")
+dates_b = dt.dates("in")
+capital = 1000000
 
-# -- TEST 2 :
-# verify that installed pandas module works correctly
-df_dict_test = pd.DataFrame(dt.dict_test, index=[0, 1])
-print(df_dict_test)
+tickers, weights = get_tickers(NAFTRAC_dicc["20180131"])
 
-# -- TEST 3 :
-# verify you can use plotly and visualize plots in jupyter notebook
+port = init_port(capital, weights, tickers, dates_a[0], restricted, comission)
+# port2 = reval_port(port, dates_a[1], restricted)
+portafolios_valor = [sum(reval_port(port, i, restricted)["Value"]) for i in dates_a]
 
-import chart_studio.plotly as py   # various tools (jupyter offline print)
-import plotly.graph_objects as go  # plotting engine
+#df_pasiva_a = pd.DataFrame([datetime.datetime.strptime(i, '%Y%m%d') for i in dates_a], columns=["timestamp"])
+#df_pasiva_a["capital"] = portafolios_valor
+#df_pasiva_a["rend"] = df_pasiva_a["capital"].pct_change()
+#df_pasiva_a["rend_acum"] = df_pasiva_a["rend"].cumsum()
 
-# example data
-df = pd.DataFrame({'column_a': [1, 2, 3, 4, 5], 'column_b': [1, 2, 3, 4, 5]})
-# basic plotly plot
-data = [go.Bar(x=df['column_a'], y=df['column_b'])]
-# instruction to view it inside jupyter
-py.iplot(data, filename='jupyter-basic_bar')
-# (alternatively) instruction to view it in web app of plotly
-# py.plot(data)
-
-# -- TEST 4 :
-# verify you can use plotly and visualize plots in web browser locally
-
-import plotly.io as pio            # to define input-output of plots
-pio.renderers.default = "browser"  # to render the plot locally in your default web browser
-
-# basic plotly plot
-plot_data = go.Figure(go.Bar(x=df['column_a'], y=df['column_b']))
-# instruction to view it in specified render (in this case browser)
-plot_data.show()
+df_pasiva_a = create_df_pasiva(dates_a, portafolios_valor)
