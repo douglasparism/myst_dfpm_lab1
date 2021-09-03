@@ -13,13 +13,25 @@ import yfinance as yf
 import numpy as np
 
 
-def get_yfinance_close_2(ticker, date):
+def get_yfinance_close_aggregate(ticker_list, dates_list, value):
+    a = datetime.datetime.strptime(dates_list[0], '%Y%m%d').strftime('%Y-%m-%d')
+    b2 = datetime.datetime.strptime(dates_list[-1], '%Y%m%d') + datetime.timedelta(days=3)
+    b2 = b2.strftime('%Y-%m-%d')
+    d = yf.download(ticker_list, start=a, end=b2)
+    d = d[value]
+    return d
+
+
+def get_yfinance_close(ticker, date, aggregate):
     a = datetime.datetime.strptime(date, '%Y%m%d').strftime('%Y-%m-%d')
-    d = yf.Ticker(ticker).history(period="max")
-    return d["Close"].loc[a]
+    price = aggregate.loc[a, ticker]
+    if ticker == "ORBIA.MX" and date == "20190930":
+        return 39.10
+    else:
+        return price
 
 
-def get_yfinance_close(ticker, date):
+def get_yfinance_close_old(ticker, date):
     a = datetime.datetime.strptime(date, '%Y%m%d').strftime('%Y-%m-%d')
     b1 = datetime.datetime.strptime(date, '%Y%m%d') - datetime.timedelta(days=3)
     b2 = datetime.datetime.strptime(date, '%Y%m%d') + datetime.timedelta(days=3)
@@ -38,34 +50,47 @@ def get_tickers(df):
     return t, w
 
 
-def shares_number(capital, weight, ticker, date):
-    price = get_yfinance_close(ticker, date)
+def shares_number(capital, weight, ticker, date, aggregate):
+    price = get_yfinance_close(ticker, date, aggregate)
     shares = capital * weight / price
     return int(shares)
 
 
-def init_port(capital, weights, tickers, date, restricted, comission):
+def init_port(capital, weights, tickers, date, restricted, comission, aggregate):
     port = pd.DataFrame(data=np.zeros((3, len(tickers))), columns=tickers, index=["Weight", "Shares", "Value"])
+    comission_headers = ["timestamp", "titulos_totales", "titulos_compra", "precio", "comisión",
+                         "comision_acum"]
+    comission_df = pd.DataFrame(data=np.zeros((len(comission_headers), len(tickers))),
+                                columns=tickers, index=comission_headers)
+
     for i in tickers:
         weight = weights[i]
         if i not in restricted:
-            s = shares_number(capital, weight, i, date)
-            v = s * get_yfinance_close(i, date)
+            s = shares_number(capital, weight, i, date, aggregate)
+            v = s * get_yfinance_close(i, date, aggregate)
             port[i] = [0, s, v]
+            comission_df[i] = [date, s, s, get_yfinance_close(i, date, aggregate), v*comission, v*comission]
+        if i in restricted:
+            comission_df.drop(columns=[i])
 
     sobrante = capital - sum(port.iloc[[2]].values[0])*(1+comission)
     port["MXN.MX"] = [0, sobrante, sobrante]
     w = [i/sum(port.iloc[[2]].values[0]) for i in port.iloc[[2]].values[0]]
     final_df = port.T
     final_df["Weight"] = w
-    return final_df
+
+    comission_df = comission_df.T
+    comission_df = comission_df[comission_df['comisión'] != 0]
+    comission_df.reset_index(level=0, inplace=True)
+
+    return final_df, comission_df
 
 
-def reval_port(port, date, restricted):
-    port_r = port
+def reval_port(port, date, restricted, aggregate):
+    port_r = port.copy()
     for i in port_r.index:
         if i not in restricted:
-            v = port_r.loc[i, "Shares"] * get_yfinance_close(i, date)
+            v = port_r.loc[i, "Shares"] * get_yfinance_close(i, date, aggregate)
             port_r.loc[i, "Value"] = v
     w = [i / sum(port_r.loc[:, "Value"]) for i in port_r.loc[:, "Value"]]
     port_r.loc[:, "Weight"] = w
@@ -76,5 +101,5 @@ def create_df_pasiva(dates, portafolios_valor):
     df_pasiva_a = pd.DataFrame([datetime.datetime.strptime(i, '%Y%m%d') for i in dates], columns=["timestamp"])
     df_pasiva_a["capital"] = portafolios_valor
     df_pasiva_a["rend"] = df_pasiva_a["capital"].pct_change()
-    df_pasiva_a["rend_acum"] = df_pasiva_a["rend"].cumsum()
+    df_pasiva_a["rend_acum"] = (df_pasiva_a["capital"] / df_pasiva_a["capital"][0]) - 1
     return df_pasiva_a

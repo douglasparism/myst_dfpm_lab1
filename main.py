@@ -12,22 +12,22 @@
 import data as dt
 from functions import *
 
-NAFTRAC_dicc = dt.get_naftrac_data()
+NAFTRAC_dicc = dt.get_naftrac_data(recalc_weights=False)
 comission = 0.00125
 restricted = ["KOFL.MX", "KOFUBL.MX", "USD.MXN", "BSMXB.MX", "NMKA.MX", "MXN.MX"]
 dates_a = dt.dates("pre")
 dates_b = dt.dates("in")
+dates_full = dt.dates("all")
 capital = 1000000
 
 tickers, weights = get_tickers(NAFTRAC_dicc["20180131"])
+aggregate = get_yfinance_close_aggregate(tickers, dates_full, "Adj Close")
 
-port = init_port(capital, weights, tickers, dates_a[0], restricted, comission)
-# port2 = reval_port(port, dates_a[1], restricted)
-portafolios_valor = [sum(reval_port(port, i, restricted)["Value"]) for i in dates_a]
 
-#df_pasiva_a = pd.DataFrame([datetime.datetime.strptime(i, '%Y%m%d') for i in dates_a], columns=["timestamp"])
-#df_pasiva_a["capital"] = portafolios_valor
-#df_pasiva_a["rend"] = df_pasiva_a["capital"].pct_change()
-#df_pasiva_a["rend_acum"] = df_pasiva_a["rend"].cumsum()
+port_a, comission_df_a = init_port(capital, weights, tickers, dates_a[0], restricted, comission, aggregate)
+portafolios_valor = [sum(reval_port(port_a, i, restricted, aggregate)["Value"]) for i in dates_a]
+df_pasiva_a = create_df_pasiva(dates_a, portafolios_valor).set_index("timestamp")
 
-df_pasiva_a = create_df_pasiva(dates_a, portafolios_valor)
+port_b, comission_df_b = init_port(capital, weights, tickers, dates_b[0], restricted, comission, aggregate)
+portafolios_valor = [sum(reval_port(port_b, i, restricted, aggregate)["Value"]) for i in dates_b]
+df_pasiva_b = create_df_pasiva(dates_b, portafolios_valor).set_index("timestamp")
